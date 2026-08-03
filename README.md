@@ -17,11 +17,11 @@ Open ./frontend/todo
 
 
 Install the modules - 
-`npm i` 
+`npm install`
+Start the application on local host -
+`npm start` then if error found set below line to load url
+'NODE_OPTIONS=--openssl-legacy-provider npm start'
 
-
-Start the application on local host - 
-`npm start`
 
 
 The application will run on `http://localhost:4200`
@@ -37,6 +37,9 @@ Install JDK 14.0.1
 
 
 Open ./restful-web-services on any IDE (IntelliJ/Eclipse etc.) and run the application.
+
+./mvnw clean install  
+./mvnw spring-boot:run
 
 
 The backend will run on `http://localhost:8080`
