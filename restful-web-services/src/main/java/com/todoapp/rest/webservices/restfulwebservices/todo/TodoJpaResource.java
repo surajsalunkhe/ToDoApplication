@@ -47,7 +47,8 @@ public class TodoJpaResource {
 
     /**
      * Returns 201 Created with a Location header pointing to the new resource.
-     * No body is returned, matching the original contract.
+     * No body is returned; the frontend ignores the response body and uses
+     * only the success status to navigate (todo.js: .then(() => history.push('/todo'))).
      */
     @PostMapping("/jpa/users/{username}/todos")
     public ResponseEntity<Void> addTodo(@PathVariable String username, @RequestBody Todo todo) {

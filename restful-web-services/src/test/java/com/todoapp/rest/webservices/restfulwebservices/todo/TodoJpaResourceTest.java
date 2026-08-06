@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Date;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -216,8 +217,8 @@ class TodoJpaResourceTest {
                 .andExpect(status().isForbidden())
                 .andReturn().getResponse().getContentAsString();
 
-        assert !responseBody.contains("at com.todoapp");
-        assert !responseBody.contains("StackTrace");
-        assert !responseBody.contains("TodoAccessDenied");
+        assertThat(responseBody).doesNotContain("at com.todoapp");
+        assertThat(responseBody).doesNotContain("StackTrace");
+        assertThat(responseBody).doesNotContain("TodoAccessDenied");
     }
 }

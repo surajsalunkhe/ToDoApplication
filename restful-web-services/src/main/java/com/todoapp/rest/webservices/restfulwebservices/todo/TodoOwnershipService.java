@@ -21,14 +21,12 @@ public class TodoOwnershipService {
 
     /**
      * Loads a todo by id, enforcing ownership against the authenticated user.
-     * Returns 404 when the todo doesn't exist at all; 403 when it exists but
-     * belongs to a different user — avoiding information leakage about
-     * whether the resource exists.
-     *
-     * Per the LLD decision the caller receives 403 in both cases from the
-     * HTTP response (GlobalExceptionHandler maps TodoNotFoundException to 404
-     * only for truly missing resources, which is acceptable here since the
-     * request already passed authentication — the todo id is not sensitive).
+     * Throws TodoNotFoundException (→ 404) when the id doesn't exist at all;
+     * throws TodoAccessDeniedException (→ 403) when it exists but belongs to
+     * a different user. These are deliberately distinct: a 404 reveals that
+     * the resource doesn't exist, while a 403 reveals that it does — callers
+     * should be aware that this design prioritises debuggability over strict
+     * non-disclosure of resource existence.
      */
     public Todo getOwnedTodoOrThrow(Long id, String authenticatedUsername) {
         Todo todo = todoJpaRepository.findById(id)
