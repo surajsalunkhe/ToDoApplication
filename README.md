@@ -1,67 +1,47 @@
-# Todo App - Full Stack - PWA - React Spring Boot
+# Todo App — Full Stack (React PWA + Spring Boot)
 
-##### [Click here](https://drive.google.com/file/d/1aUtitzqu06ibs0KCbH_zC9fJhmOFHEN4/view?usp=sharing) to view the application.
+##### Demo
+[Click here](https://drive.google.com/file/d/1aUtitzqu06ibs0KCbH_zC9fJhmOFHEN4/view?usp=sharing) to view the application.
 
+## Repository structure
+- Frontend: `frontend/todo-app-pwa`
+- Backend: `restful-web-services`
 
-This application is subject to Copyright. 
+## Local setup
 
+### Prerequisites
+- Node.js + npm
+- JDK **14.0.1**
 
-### Set up
-
-Install NodeJs.
-
-#### [Frontend](./frontend/todo-app-pwa) - 
-
-
-Open ./frontend/todo
-
-
-Install the modules - 
-`npm install`
-Start the application on local host -
-`npm start` then if error found set below line to load url
-'NODE_OPTIONS=--openssl-legacy-provider npm start'
-
-
-
-The application will run on `http://localhost:4200`
-
-
-1. React JS
-2. Material UI
-3. Axios - API Calls
-
-#### [Backend](./restful-web-services) - 
-
-Install JDK 14.0.1
-
-
-Open ./restful-web-services on any IDE (IntelliJ/Eclipse etc.) and run the application.
-
-./mvnw clean install  
+### 1) Backend
+```bash
+cd restful-web-services
+./mvnw clean install
 ./mvnw spring-boot:run
+```
+Backend: http://localhost:8080
 
+### 2) Frontend
+```bash
+cd frontend/todo-app-pwa
+npm install
+npm start
+```
+Frontend: http://localhost:4200
 
-The backend will run on `http://localhost:8080`
+If you hit OpenSSL legacy provider issues:
+```bash
+NODE_OPTIONS=--openssl-legacy-provider npm start
+```
 
+## Database (H2 In-Memory)
+- H2 console: http://localhost:8080/h2-console
+- JDBC URL: `jdbc:h2:mem:testdb`
 
-1. Spring Boot
-2. Basic Authentication and JWT implemented both using Spring Security.
-3. H2 Hibernate JPA
+> Note: in-memory DB resets when the backend stops.
 
+## Component docs
+- Frontend README: `frontend/todo-app-pwa/README.md`
+- Backend README: `restful-web-services/README.md`
 
-#### Database -
-
-The databse will be created with the start of the application. No set up required.
-Please note - It is an In-Memory Database. Therefore, the new updated and created data will be lost once the application is stopped. 
-
-
-The database can be accessed at `http://localhost:8080/h2-console`
-
-
-JDBC URL: jdbc:h2:mem:testdb
-
-
-In-Memory DB
-H2 Hibernate
-
+> **Needs input**: add deployment/CI details and confirm which auth mode (Basic vs JWT) is the default integration.
