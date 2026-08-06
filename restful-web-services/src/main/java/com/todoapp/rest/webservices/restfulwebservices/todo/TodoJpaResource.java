@@ -1,8 +1,11 @@
 package com.todoapp.rest.webservices.restfulwebservices.todo;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
@@ -18,8 +21,18 @@ public class TodoJpaResource {
         this.todoOwnershipService = todoOwnershipService;
     }
 
+    /**
+     * Returns the authenticated username from the security context.
+     * Throws 401 if there is no valid authentication (guards against a
+     * misconfigured security filter chain that lets unauthenticated requests
+     * reach the controller).
+     */
     private String authenticatedUsername() {
-        return SecurityContextHolder.getContext().getAuthentication().getName();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        return auth.getName();
     }
 
     @GetMapping("/jpa/users/{username}/todos")
@@ -29,10 +42,13 @@ public class TodoJpaResource {
 
     @GetMapping("/jpa/users/{username}/todos/{id}")
     public Todo getTodo(@PathVariable String username, @PathVariable long id) {
-        todoOwnershipService.assertSameUser(username, authenticatedUsername());
-        return todoOwnershipService.getOwnedTodoOrThrow(id, authenticatedUsername());
+        return todoOwnershipService.getTodoForUser(username, id, authenticatedUsername());
     }
 
+    /**
+     * Returns 201 Created with a Location header pointing to the new resource.
+     * No body is returned, matching the original contract.
+     */
     @PostMapping("/jpa/users/{username}/todos")
     public ResponseEntity<Void> addTodo(@PathVariable String username, @RequestBody Todo todo) {
         Todo created = todoOwnershipService.createTodoForUser(username, todo, authenticatedUsername());

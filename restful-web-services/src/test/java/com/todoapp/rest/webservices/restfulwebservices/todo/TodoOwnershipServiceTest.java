@@ -37,7 +37,6 @@ class TodoOwnershipServiceTest {
 
     @Test
     void assertSameUser_differentUsername_throws403() {
-        // AC1: alice cannot access bob's path
         assertThatThrownBy(() -> service.assertSameUser("bob", "alice"))
                 .isInstanceOf(TodoAccessDeniedException.class);
     }
@@ -47,7 +46,7 @@ class TodoOwnershipServiceTest {
     @Test
     void getOwnedTodoOrThrow_todoOwnedByUser_returnsIt() {
         Todo todo = new Todo(1L, "alice", "Learn JPA", new Date(), false);
-        when(todoJpaRepository.findByIdAndUsername(1L, "alice")).thenReturn(Optional.of(todo));
+        when(todoJpaRepository.findById(1L)).thenReturn(Optional.of(todo));
 
         Todo result = service.getOwnedTodoOrThrow(1L, "alice");
 
@@ -55,19 +54,49 @@ class TodoOwnershipServiceTest {
     }
 
     @Test
+    void getOwnedTodoOrThrow_todoDoesNotExist_throws404() {
+        // Missing todo → 404, not 403 (no information leakage needed for a truly absent resource)
+        when(todoJpaRepository.findById(42L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getOwnedTodoOrThrow(42L, "alice"))
+                .isInstanceOf(TodoNotFoundException.class);
+    }
+
+    @Test
     void getOwnedTodoOrThrow_todoOwnedByOtherUser_throws403() {
-        // AC3: alice tries to GET a todo belonging to bob
-        when(todoJpaRepository.findByIdAndUsername(42L, "alice")).thenReturn(Optional.empty());
+        // AC3: todo exists but belongs to bob — alice gets 403
+        Todo bobsTodo = new Todo(42L, "bob", "Bob task", new Date(), false);
+        when(todoJpaRepository.findById(42L)).thenReturn(Optional.of(bobsTodo));
 
         assertThatThrownBy(() -> service.getOwnedTodoOrThrow(42L, "alice"))
                 .isInstanceOf(TodoAccessDeniedException.class);
+    }
+
+    // --- getTodoForUser ---
+
+    @Test
+    void getTodoForUser_pathMismatch_throws403BeforeQuery() {
+        // AC1 variant: path mismatch is caught before any DB call
+        assertThatThrownBy(() -> service.getTodoForUser("bob", 1L, "alice"))
+                .isInstanceOf(TodoAccessDeniedException.class);
+
+        verifyNoInteractions(todoJpaRepository);
+    }
+
+    @Test
+    void getTodoForUser_ownTodo_returnsIt() {
+        Todo todo = new Todo(1L, "alice", "Task", new Date(), false);
+        when(todoJpaRepository.findById(1L)).thenReturn(Optional.of(todo));
+
+        Todo result = service.getTodoForUser("alice", 1L, "alice");
+
+        assertThat(result).isEqualTo(todo);
     }
 
     // --- listTodosForUser ---
 
     @Test
     void listTodosForUser_ownPath_returnsTodos() {
-        // AC5: same-user access succeeds
         Todo todo = new Todo(1L, "alice", "Task", new Date(), false);
         when(todoJpaRepository.findByUsername("alice")).thenReturn(List.of(todo));
 
@@ -114,10 +143,9 @@ class TodoOwnershipServiceTest {
 
     @Test
     void updateTodoForUser_ownTodo_succeeds() {
-        // AC5: legitimate same-user update succeeds
         Todo existing = new Todo(5L, "alice", "Old task", new Date(), false);
         Todo update = new Todo(5L, "alice", "New task", new Date(), true);
-        when(todoJpaRepository.findByIdAndUsername(5L, "alice")).thenReturn(Optional.of(existing));
+        when(todoJpaRepository.findById(5L)).thenReturn(Optional.of(existing));
         when(todoJpaRepository.save(any())).thenReturn(update);
 
         Todo result = service.updateTodoForUser("alice", 5L, update, "alice");
@@ -128,11 +156,22 @@ class TodoOwnershipServiceTest {
 
     @Test
     void updateTodoForUser_todoOwnedByOtherUser_throws403() {
-        // AC2: alice cannot PUT to a todo owned by bob (even via alice's URL path)
-        when(todoJpaRepository.findByIdAndUsername(99L, "alice")).thenReturn(Optional.empty());
+        // AC2: alice cannot PUT a todo owned by bob
+        Todo bobsTodo = new Todo(99L, "bob", "Bob task", new Date(), false);
+        when(todoJpaRepository.findById(99L)).thenReturn(Optional.of(bobsTodo));
 
         assertThatThrownBy(() -> service.updateTodoForUser("alice", 99L, new Todo(), "alice"))
                 .isInstanceOf(TodoAccessDeniedException.class);
+
+        verify(todoJpaRepository, never()).save(any());
+    }
+
+    @Test
+    void updateTodoForUser_todoNotFound_throws404() {
+        when(todoJpaRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateTodoForUser("alice", 99L, new Todo(), "alice"))
+                .isInstanceOf(TodoNotFoundException.class);
 
         verify(todoJpaRepository, never()).save(any());
     }
@@ -150,7 +189,7 @@ class TodoOwnershipServiceTest {
         // AC4-variant: body id/username are overwritten by the service
         Todo existing = new Todo(5L, "alice", "Old task", new Date(), false);
         Todo update = new Todo(999L, "EVIL", "New task", new Date(), true);
-        when(todoJpaRepository.findByIdAndUsername(5L, "alice")).thenReturn(Optional.of(existing));
+        when(todoJpaRepository.findById(5L)).thenReturn(Optional.of(existing));
         when(todoJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.updateTodoForUser("alice", 5L, update, "alice");
@@ -163,9 +202,8 @@ class TodoOwnershipServiceTest {
 
     @Test
     void deleteTodoForUser_ownTodo_deletesIt() {
-        // AC5: legitimate same-user delete succeeds
         Todo existing = new Todo(3L, "alice", "Task", new Date(), false);
-        when(todoJpaRepository.findByIdAndUsername(3L, "alice")).thenReturn(Optional.of(existing));
+        when(todoJpaRepository.findById(3L)).thenReturn(Optional.of(existing));
 
         service.deleteTodoForUser("alice", 3L, "alice");
 
@@ -175,7 +213,8 @@ class TodoOwnershipServiceTest {
     @Test
     void deleteTodoForUser_todoOwnedByOtherUser_throws403() {
         // AC2: alice cannot DELETE a todo belonging to bob
-        when(todoJpaRepository.findByIdAndUsername(7L, "alice")).thenReturn(Optional.empty());
+        Todo bobsTodo = new Todo(7L, "bob", "Bob task", new Date(), false);
+        when(todoJpaRepository.findById(7L)).thenReturn(Optional.of(bobsTodo));
 
         assertThatThrownBy(() -> service.deleteTodoForUser("alice", 7L, "alice"))
                 .isInstanceOf(TodoAccessDeniedException.class);
@@ -184,8 +223,17 @@ class TodoOwnershipServiceTest {
     }
 
     @Test
+    void deleteTodoForUser_todoNotFound_throws404() {
+        when(todoJpaRepository.findById(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteTodoForUser("alice", 7L, "alice"))
+                .isInstanceOf(TodoNotFoundException.class);
+
+        verify(todoJpaRepository, never()).deleteById(any());
+    }
+
+    @Test
     void deleteTodoForUser_pathMismatch_throws403() {
-        // AC1 variant: path user differs from authenticated user
         assertThatThrownBy(() -> service.deleteTodoForUser("bob", 7L, "alice"))
                 .isInstanceOf(TodoAccessDeniedException.class);
 

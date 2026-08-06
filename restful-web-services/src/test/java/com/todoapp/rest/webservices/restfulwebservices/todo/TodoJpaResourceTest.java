@@ -83,7 +83,7 @@ class TodoJpaResourceTest {
     @Test
     void getTodo_todoOwnedByOther_returns403() throws Exception {
         authenticateAs("alice");
-        when(todoOwnershipService.getOwnedTodoOrThrow(99L, "alice"))
+        when(todoOwnershipService.getTodoForUser("alice", 99L, "alice"))
                 .thenThrow(new TodoAccessDeniedException());
 
         mockMvc.perform(get("/jpa/users/alice/todos/99"))
@@ -98,11 +98,21 @@ class TodoJpaResourceTest {
     void getTodo_ownTodo_returns200() throws Exception {
         authenticateAs("alice");
         Todo todo = new Todo(1L, "alice", "Task", new Date(), false);
-        when(todoOwnershipService.getOwnedTodoOrThrow(1L, "alice")).thenReturn(todo);
+        when(todoOwnershipService.getTodoForUser("alice", 1L, "alice")).thenReturn(todo);
 
         mockMvc.perform(get("/jpa/users/alice/todos/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("alice"));
+    }
+
+    // --- NPE guard: unauthenticated request → 401 ---
+
+    @Test
+    void anyEndpoint_noAuthentication_returns401() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/jpa/users/alice/todos"))
+                .andExpect(status().isUnauthorized());
     }
 
     // --- AC4: POST body username is overridden by server ---

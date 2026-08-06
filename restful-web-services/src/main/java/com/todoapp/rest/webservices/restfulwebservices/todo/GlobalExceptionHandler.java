@@ -16,4 +16,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Collections.singletonMap("error", "Access denied"));
     }
+
+    @ExceptionHandler(TodoNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNotFound(TodoNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap("error", "Todo not found"));
+    }
 }

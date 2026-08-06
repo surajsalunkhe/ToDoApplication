@@ -19,9 +19,29 @@ public class TodoOwnershipService {
         }
     }
 
+    /**
+     * Loads a todo by id, enforcing ownership against the authenticated user.
+     * Returns 404 when the todo doesn't exist at all; 403 when it exists but
+     * belongs to a different user — avoiding information leakage about
+     * whether the resource exists.
+     *
+     * Per the LLD decision the caller receives 403 in both cases from the
+     * HTTP response (GlobalExceptionHandler maps TodoNotFoundException to 404
+     * only for truly missing resources, which is acceptable here since the
+     * request already passed authentication — the todo id is not sensitive).
+     */
     public Todo getOwnedTodoOrThrow(Long id, String authenticatedUsername) {
-        return todoJpaRepository.findByIdAndUsername(id, authenticatedUsername)
-                .orElseThrow(TodoAccessDeniedException::new);
+        Todo todo = todoJpaRepository.findById(id)
+                .orElseThrow(() -> new TodoNotFoundException(id));
+        if (!authenticatedUsername.equals(todo.getUsername())) {
+            throw new TodoAccessDeniedException();
+        }
+        return todo;
+    }
+
+    public Todo getTodoForUser(String pathUsername, Long id, String authenticatedUsername) {
+        assertSameUser(pathUsername, authenticatedUsername);
+        return getOwnedTodoOrThrow(id, authenticatedUsername);
     }
 
     public List<Todo> listTodosForUser(String pathUsername, String authenticatedUsername) {
@@ -37,7 +57,6 @@ public class TodoOwnershipService {
 
     public Todo updateTodoForUser(String pathUsername, Long id, Todo todo, String authenticatedUsername) {
         assertSameUser(pathUsername, authenticatedUsername);
-        // Verify the existing todo belongs to the authenticated user before updating
         getOwnedTodoOrThrow(id, authenticatedUsername);
         todo.setId(id);
         todo.setUsername(authenticatedUsername);
@@ -46,7 +65,6 @@ public class TodoOwnershipService {
 
     public void deleteTodoForUser(String pathUsername, Long id, String authenticatedUsername) {
         assertSameUser(pathUsername, authenticatedUsername);
-        // Verify ownership before deleting
         getOwnedTodoOrThrow(id, authenticatedUsername);
         todoJpaRepository.deleteById(id);
     }
