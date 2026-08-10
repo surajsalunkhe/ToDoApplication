@@ -1,87 +1,59 @@
-# Implementation Plan — EPMEDUAI-1312: Secure multi-user ToDo access
+# Implementation Plan — Improve ToDo API reliability, usability, and safety
 
-This plan covers the approved stories under Jira epic **EPMEDUAI-1312 — Secure multi-user ToDo access**:
+Repo: https://github.com/surajsalunkhe/ToDoApplication
 
-- **EPMEDUAI-1316** — Align on JWT authentication flow for frontend + document supported auth
-- **EPMEDUAI-1315** — Enforce user ownership checks on ToDo endpoints (prevent IDOR)
+This plan implements the approved requirements (1 Epic + 3 Stories):
 
-Repository context (from project brief):
+- Story 1: **Paginate and search ToDo list by username**
+- Story 2: **Prevent cross-user access to ToDos (ownership validation)**
+m Story 3: **Standardize API error responses and input validation for ToDo endpoints**
 
-- Frontend: React / Material UI / Axios PWA (`frontend/todo-app-pwa`)
-- Backend: Spring Boot REST `restful-web-services` secured with Spring Security (Basic Auth + JWT)
-- Persistence: Hibernate JPA + H2 (in-memory)
+Note: Keys are not yet available in this repo flow; use placeholders in branch names (e.g., `feature/TODO-123-slug` when Jira Keys exist).
 
----
-
-## 1) Story Sequencing & Dependencies
-
-### Principles
-- **Contract first**: lock down the authentication flow (endpoints, headers, token storage, error handling) before hardening authorization.
-  - Prevents backend changes the frontend can’t consume.
-  - Reduces rework around Axios interceptors and Spring Security configuration.
-
-### Sequence
-
-1. **EPMEDUAI-1316 (prep/contract)**: Align on JWT authentication flow for frontend + document supported auth
-   - **Depends on**: None (should be first deliverable)
-   - **Unlocks**: all subsequent security hardening (ownership / IDOR)
-   - **Outputs**:
-     - Define supported auth modes (Basic Auth vs JWT) and what the PWA uses
-     - Define login → token receipt → token attachment on API calls
-     - Standardize headers: `Authorization: Bearer <token>`
-     - Specify error behavior: 401 (unauthenticated) vs 403 (forbidden)
-   - **Backend notes**: confirm/standardize auth endpoint(s) and the JWT claim used to identify the user (e.g., `sub` / username).
-   - **Frontend notes**: Axios interceptor for attaching token + global handling for 401/403.
-
-2. **EPMEDUAI-1315 (implement)**: Enforce user ownership checks on ToDo endpoints (prevent IDOR)
-   - **Depends on**: EPMEDUAI-1316 (clear “current user” definition from JWT)
-   - **Backend first**: enforce ownership at service/repository level so a malicious client cannot bypass it.
-   - **Frontend follow-up**: ensure all ToDo calls attach token and gracefully handle 403/404.
 
 ---
 
-## 2) Rough Effort Estimates
+## High-level implementation strategy
 
-Estimates are rough (calendar days) assuming a single developer familiar with the codebase.
+The focus is production-readiness without expanding scope: we hinder other users' ToDos, make errors consistent and usable, and add scalable listing (pagination + search).
 
-| Story | Range effort |
-|---|---:|
-| **EPMEDUAI-1316** | 0.5–1.5 days |
-| **EPMEDUAI-1315** | 1–2.5 days |
+* **Backend first** for API contract changes. Frontend changes follow the new contract.
+  - Close the IDOR/cross-user access gap before we make listing more powerful (page/search).
+  - Introduce a standard error body layer before adding new input validation and query params.
 
-Notes:
-- If the existing JWT flow is already consistent, the effort for 1316 is low.
-- 1315 should include automated tests because this is a security regression risk.
+* **Backwardcompatibility is a priority**. For pagination, prefer a mode where the existing endpoint still returns a full list if no `page`/`size` are provided, but supports a paged response when they are provided.
 
----
-
-## 3) Branch Naming Convention
-
-- Planning PR: `plan/EPMEDUAI-1312-implementation-plan`
-- Feature branches: `feature/<STORY-KEY>-<slug>`
-  - `feature/EPMEDUAI-1316-jwt-auth-flow-alignment`
-  - `feature/EPMEDUAI-1315-ownership-checks-idor`
+* **Test-the-high-risk along the way**. Security and contract regressions are more damageful than bugs in frontend wiring.
 
 ---
 
-## 4) Risk / Impact Notes
+## Development phases (suggested milestones/sprints)
 
-### EPMEDUAI-1316 — Auth flow alignment + docs
-- **Auth/API breaking changes**: standardizing on “Bearer JWT” can break existing calls until Axios interceptors and login flow match the backend contract.
-- **CORS / preflight**: `Authorization` often requires allow-headers and exposed-headers configuration in Spring Security.
-- **Token storage**: localStorage is convenient but increases XSS risk; in-memory is safer but requires re-login on reload. Decide and document.
+Assumption: 1 sprint = 1 week. Adjust as needed.
 
-### EPMEDUAI-1315 — Ownership checks (IDOR)
-- **Expected API behavior change**: unauthorized access to another user’s ToDo should consistently fail (403 or 404). UI must handle this gracefully.
-- **Implementation placement**: prefer service/repository-level filtering (query by id + username) to avoid accidental bypass.
-- **DB/seed impact**: if ToDo rows are missing owners, expect seed data update or micro-schema adjustment (including H2).
+### Phase 0 — Contract alignment (0.5 day)
+- Confirm behavior:
+  - Ownership failure policy: **404 recommended** (to reduce username/id enumeration) vs 403.
+  - Pagination response shape: Spring `Page<Todo>` vs custom DOT (items + meta)
+  - Standard error schema (field errors structure)
 
----
+### Phase 1 — Security/data safety (Story 2) (1 – 2 days)
+- Backend: ownership-aware lookups for GET/PUT/DELETE id-based operations
+- Tests: assert cross-user access is denied consistently (404/403)
 
-## 5) Suggested Milestones / Sprint Grouping
+### Phase 2 — Standard errors + validation (Story 3) (2 – 3 days)
+- Backend: @ControllerAdvice + Error DTO contract
+- Backend: Bean Validation on ToDo body and query params
+- Frontend: normalize Axios errors based on new structured error body
 
-- **Milestone 1: Auth Contract Locked (EPMEDUAI-1316)**
-  - Exit criteria: PWA can login, receive JWT, and call at least one protected endpoint via Bearer token.
 
-- **Milestone 2: IDOR Closed (EPMEDUAI-1315)**
-  - Exit criteria: attempts to read/update/delete another user’s todo consistently fail, with tests proving it.
+### Phase 3 — Pagination + search (Story 1) (2 – 3 days)
+- Backend: add page/size / q query params for list endpoint
+- Backend: paged repository methods and search
+- Frontend: update TodoDataService to pass query params and handle paged or unpaged response shape
+
+  
+### Phase 4 – Hardening & docs (1 day)
+- Api examples (curl)
+- Smoke test flow: auth -> list -> create -> update -> delete
+- Review logging for secret leakage (tokens)
